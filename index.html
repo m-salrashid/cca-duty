@@ -314,6 +314,18 @@ textarea.inp{height:auto;padding:10px 12px;line-height:1.5;resize:vertical}
 .acts{display:flex;gap:8px;margin-left:auto;flex-shrink:0}
 .dlist{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:18px;background:var(--need-bg);color:var(--need-ink);font-size:14px}
 .okbox{padding:12px 14px;border-radius:18px;background:var(--field);font-size:14px;font-weight:700}
+/* Coach attendance */
+.attok{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:16px;background:var(--field);font-size:13.5px}
+.attok b{font-size:13px}
+.attwait{font-size:13px;color:var(--muted)}
+.coach{border:1.5px solid var(--line);border-radius:20px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.coach .cname{display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:800}
+.coach .tag{font-size:12px;font-weight:800;color:var(--muted)}
+.coach .seg{grid-template-columns:repeat(3,minmax(0,1fr))}
+.coach .seg button{height:38px;font-size:14px}
+.claim{font-size:12.5px;font-weight:700;padding:8px 10px;border-radius:12px;background:var(--soft);color:var(--soft-ink)}
+.claim.none{background:var(--field);color:var(--muted)}
+.ctotals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 
 /* =========================================================
    LAPTOP (wider than 800px)
@@ -440,9 +452,11 @@ document.addEventListener('visibilitychange', function() {
    DATA HELPERS
    ========================================================= */
 var DUTY_IX = {};
+var ATT_IX = {};
 function index() {
-  DUTY_IX = {};
+  DUTY_IX = {}; ATT_IX = {};
   D.duties.forEach(function(d) { var k = d.itemType + '|' + d.itemId; (DUTY_IX[k] = DUTY_IX[k] || []).push(d); });
+  (D.attendance || []).forEach(function(a) { var k = a.itemType + '|' + a.itemId; (ATT_IX[k] = ATT_IX[k] || []).push(a); });
 }
 function dutiesOf(it) { return DUTY_IX[it.kind + '|' + it.id] || []; }
 function teacher(id) { return (D.teachers || []).find(function(t) { return t.id === id; }) || null; }
@@ -484,6 +498,49 @@ function slots(it) {
   return out;
 }
 function mineOn(it) { return dutiesOf(it).find(function(d) { return d.teacherId === ME; }) || null; }
+
+/* ---------- Coach attendance helpers ---------- */
+function coaches() { return D.coaches || []; }
+function attOf(it) { return ATT_IX[it.kind + '|' + it.id] || []; }
+function coachable(it) { return coaches().length > 0 && !isNoCca(it) && !isCancelledMatch(it); }
+function attStart(it) { return it.kind === 'MATCH' ? (it.m.dismissal || it.m.transport || it.m.kickoff || '') : (it.s.start || ''); }
+function nowHM() {
+  var p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Singapore', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  var o = {}; p.forEach(function(x) { o[x.type] = x.value; }); return o.hour + ':' + o.minute;
+}
+/* Can I take (or, as admin, change) this item's coach attendance now? */
+function attCanTake(it) {
+  if (!coachable(it) || !ME) return false;
+  var t = today(), adm = isAdmin();
+  if (it.date > t) return false;
+  if (!adm && !mineOn(it)) return false;
+  if (attOf(it).length && !adm) return false;
+  if (it.date === t && !adm && attStart(it) && nowHM() < attStart(it)) return false;
+  return true;
+}
+function hoursBetween(a, b) {
+  var x = String(a || '').match(/^(\d{2}):(\d{2})$/), y = String(b || '').match(/^(\d{2}):(\d{2})$/);
+  if (!x || !y) return NaN;
+  var m = (+y[1] * 60 + +y[2]) - (+x[1] * 60 + +x[2]);
+  return m > 0 ? Math.round(m / 60 * 100) / 100 : NaN;
+}
+/* The box on a card: who came, or the button to take attendance. */
+function attBlock(it) {
+  if (!coachable(it) || it.date > today()) return '';
+  var recs = attOf(it), adm = isAdmin(), mine = mineOn(it);
+  if (!mine && !adm) return '';
+  if (recs.length) {
+    var by = recs[0].changedBy ? 'Changed by ' + recs[0].changedBy : 'Coaches confirmed by ' + (recs[0].confirmedBy || '–');
+    var h = '<div class="attok"><b>✓ ' + esc(by) + '</b>' + recs.map(function(a) {
+      return '<span>' + esc(a.coachName) + ' · ' + esc(a.status === 'Relief' ? 'Relief Coach' : a.status) + (a.status !== 'Absent' && a.timeIn ? ' · ' + esc(tmRange(a.timeIn, a.timeOut)) + ' · ' + esc(a.hours) + ' h' : '') + '</span>';
+    }).join('') + '</div>';
+    if (adm) h += '<button type="button" class="btn b-grey full" ' + attr({ act: 'att', kind: it.kind, id: it.id }) + '>Change coach attendance</button>';
+    return h;
+  }
+  if (attCanTake(it)) return '<button type="button" class="btn b-pri full" ' + attr({ act: 'att', kind: it.kind, id: it.id }) + '>Take coach attendance</button>';
+  if (it.date === today() && attStart(it)) return '<div class="attwait">Coach attendance opens at ' + esc(tm(attStart(it))) + '.</div>';
+  return '';
+}
 
 /* =========================================================
    DATES AND TIMES
@@ -633,6 +690,7 @@ function itemCard(it, opt) {
     h += '<div class="line"><span>Result</span><span class="pill p-match">' + esc((it.m.result ? it.m.result + ' ' : '') + (it.m.scoreUs !== '' ? it.m.scoreUs + '–' + it.m.scoreThem : '')) + '</span></div>';
   }
   h += dutyLines(it, opt.compact);
+  if (!opt.compact) h += attBlock(it);
   if (opt.actions) h += opt.actions;
   return h + '</article>';
 }
@@ -832,6 +890,7 @@ function renderDuties() {
     var sub = it ? (it.kind === 'MATCH' ? [it.m.venue, it.m.transport ? 'Bus leaves ' + tm(it.m.transport) : ''].filter(Boolean).join(' · ') : [it.s.groups, it.s.venue].filter(Boolean).join(' · ')) : '';
     h += '<article class="card"><div class="row"><span class="when">' + esc(when) + '</span><span class="pill ' + (d.itemType === 'MATCH' ? 'p-match' : 'p-train') + '">' + esc(role) + '</span></div>' +
       '<div class="ttl">' + esc(it ? titleOf(it) : d.title) + '</div>' + (sub ? '<div class="sub">' + esc(sub) + '</div>' : '') +
+      (it ? attBlock(it) : '') +
       (S.dview === 'upcoming' ? '<div class="row" style="justify-content:flex-end;gap:8px"><button type="button" class="btn b-pri" ' + attr({ act: 'swap', duty: d.id }) + '>Swap</button><button type="button" class="btn b-red" ' + attr({ act: 'cancel', duty: d.id }) + '>Cancel</button></div>' : '') +
       '</article>';
   });
@@ -1017,6 +1076,11 @@ function renderAdmin() {
     '<div class="adds"><button type="button" class="btn b-pri big" data-act="matchForm" data-id="">' + ICON.plus + 'Match</button><button type="button" class="btn b-out big" data-act="eventForm" data-id="">' + ICON.plus + 'Event</button></div>' +
     '<div class="seg" role="group" aria-label="Which items">' + [['overview', 'Overview'], ['up', 'Upcoming'], ['past', 'Past / deleted']].map(function(v) {
       return '<button type="button" class="' + (AD.view === v[0] ? 'on' : '') + '" ' + attr({ act: 'aview', view: v[0] }) + '>' + v[1] + '</button>'; }).join('') + '</div>';
+  if (coaches().length) {
+    var missing = adCoachItems(monthKey(t)).filter(function(it) { return !attOf(it).length; }).length;
+    h += '<button type="button" class="btn ' + (AD.view === 'coach' ? 'b-pri' : 'b-out') + ' full" data-act="aview" data-view="coach">Coach attendance' + (missing ? ' · ' + missing + ' not taken this month' : '') + '</button>';
+  }
+  if (AD.view === 'coach') { el.innerHTML = h + adCoachView() + '</div>'; return; }
   if (AD.err) { el.innerHTML = h + '<div class="empty">' + esc(AD.err) + '</div></div>'; return; }
   if (!AD.data) { el.innerHTML = h + '<div class="skel"></div><div class="skel"></div></div>'; return; }
   var list = adItems();
@@ -1041,6 +1105,82 @@ function renderAdmin() {
     if (a) { var r = a.getBoundingClientRect(), bottom = window.innerHeight - (tb ? tb.offsetHeight : 0) - 8; if (r.top > bottom - 120) window.scrollBy({ top: r.top - (bottom - 260), behavior: 'auto' }); }
   }
 }
+/* Admin › Coach attendance: every session, match and event this month up to today. */
+function adCoachItems(mk) {
+  var t = today();
+  return items().filter(function(it) { return monthKey(it.date) === mk && it.date <= t && coachable(it); });
+}
+function adCoachView() {
+  var mk = AD.cmonth || monthKey(today()); AD.cmonth = mk;
+  var list = adCoachItems(mk).reverse();
+  var h = '<div class="nav"><button type="button" class="icon-btn" data-act="acmonth" data-step="-1" aria-label="Previous month">' + ICON.left + '</button><div class="t"><b>' + esc(monthLabel(mk)) + '</b><span>Hours go to the CLAIMS tabs in the sheet</span></div><button type="button" class="icon-btn" data-act="acmonth" data-step="1" aria-label="Next month">' + ICON.right + '</button></div>';
+  h += '<div class="ctotals">' + coaches().map(function(c) {
+    var hrs = 0, n = 0;
+    (D.attendance || []).forEach(function(a) {
+      if (a.coachId !== c.id || a.status === 'Absent') return;
+      var it = findItem(a.itemType, a.itemId); if (!it || monthKey(it.date) !== mk) return;
+      hrs += Number(a.hours) || 0; n++;
+    });
+    return '<div class="card" style="gap:4px"><span class="muted" style="font-size:13px;font-weight:700">' + esc(c.name) + (c.tab ? ' · Coach ' + esc(c.tab) : '') + '</span><span class="big-n" style="font-size:26px">' + (Math.round(hrs * 100) / 100) + ' <small>h</small></span><span class="muted" style="font-size:12px">' + n + ' session' + (n === 1 ? '' : 's') + ' this month</span></div>';
+  }).join('') + '</div>';
+  if (!list.length) return h + '<div class="empty">No sessions, matches or events so far this month.</div>';
+  return h + '<div class="list2 stack">' + list.map(function(it) {
+    var done = attOf(it).length;
+    return '<article class="card"><div class="row"><span class="when">' + esc(whenOf(it)) + '</span><span class="pills">' + (done ? '' : '<span class="pill p-need">Not taken</span>') + typePill(it) + '</span></div><div class="ttl">' + esc(titleOf(it)) + '</div>' +
+      (done ? attBlock(it) : '<button type="button" class="btn b-pri full" ' + attr({ act: 'att', kind: it.kind, id: it.id }) + '>Take coach attendance</button>') + '</article>';
+  }).join('') + '</div>';
+}
+
+/* ---------- Coach attendance sheet ---------- */
+var ATT = null;
+function openAttendance(kind, id) {
+  var it = findItem(kind, id); if (!it) return;
+  var recs = attOf(it), train = it.kind === 'SESSION' && !isEvent(it);
+  var dIn = it.kind === 'MATCH' ? (it.m.dismissal || it.m.transport || it.m.kickoff || '') : (it.s.start || '');
+  var dOut = it.kind === 'MATCH' ? '' : (it.s.end || '');
+  ATT = { kind: kind, id: id, train: train, rows: coaches().map(function(c) {
+    var r = recs.find(function(a) { return a.coachId === c.id; });
+    return { c: c, status: r ? r.status : (train ? 'Present' : 'Absent'), tin: r && r.timeIn ? r.timeIn : dIn, tout: r && r.timeOut ? r.timeOut : dOut, note: '' };
+  }) };
+  var h = sheetTop('Coach attendance') + '<div class="box"><b style="font-size:16px">' + esc(titleOf(it)) + '</b><div class="sub">' + esc(whenOf(it)) + (train ? ' · times filled in for training' : ' · change the times if needed') + '</div></div>';
+  ATT.rows.forEach(function(r, i) {
+    h += '<div class="coach" id="coach' + i + '"><div class="cname"><span>' + esc(r.c.name) + '</span><span class="tag">' + (r.c.tab ? 'Coach ' + esc(r.c.tab) : '') + '</span></div>' +
+      '<div class="seg" role="group" aria-label="' + esc(r.c.name) + '">' + [['Present', 'Present'], ['Absent', train ? 'Absent' : 'Not here'], ['Relief', 'Relief']].map(function(o) {
+        return '<button type="button" ' + attr({ act: 'attSet', i: i, v: o[0] }) + '>' + o[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="two attTimes"><div class="f"><label for="attIn' + i + '">Time in</label><input class="inp attT" type="time" id="attIn' + i + '" data-i="' + i + '" value="' + esc(r.tin) + '"></div><div class="f"><label for="attOut' + i + '">Time out</label><input class="inp attT" type="time" id="attOut' + i + '" data-i="' + i + '" value="' + esc(r.tout) + '"></div></div>' +
+      '<div class="f attNoteF"><label for="attNote' + i + '">Note for Remarks (optional)</label><input class="inp" id="attNote' + i + '" maxlength="80" placeholder="e.g. left early"></div>' +
+      '<div class="claim" id="attClaim' + i + '"></div></div>';
+  });
+  h += '<p class="note">Relief: a relief coach came instead. The hours go on this coach\'s claim with "Relief Coach" in Remarks.' + (recs.length ? '' : ' Once confirmed, only a CCA admin can change it.') + '</p>' +
+    pinField(isAdmin() && !mineOn(it) ? 'Your PIN (CCA admin)' : 'Your PIN') + errBox() +
+    '<button type="button" class="btn b-pri big full" data-act="doAtt">Confirm attendance</button>';
+  openSheet({ kind: 'att' }, h);
+  ATT.rows.forEach(function(r, i) { attPaint(i); });
+  document.querySelectorAll('.attT').forEach(function(x) { x.addEventListener('input', function() { attPaint(+x.getAttribute('data-i')); }); });
+}
+function attPaint(i) {
+  var r = ATT.rows[i], box = document.getElementById('coach' + i); if (!box) return;
+  r.tin = document.getElementById('attIn' + i).value; r.tout = document.getElementById('attOut' + i).value;
+  box.querySelectorAll('.seg button').forEach(function(b) { b.classList.toggle('on', b.getAttribute('data-v') === r.status); });
+  var here = r.status !== 'Absent';
+  box.querySelector('.attTimes').style.display = here ? '' : 'none';
+  box.querySelector('.attNoteF').style.display = here ? '' : 'none';
+  var cl = document.getElementById('attClaim' + i), hrs = hoursBetween(r.tin, r.tout);
+  cl.classList.toggle('none', !here);
+  cl.textContent = !here ? 'No claim row for ' + r.c.name + '.' :
+    (isNaN(hrs) ? 'Enter the time in and time out.' : 'Claims tab ' + (r.c.tab || '') + ': ' + hrs + ' h' + (r.status === 'Relief' ? ' · Remarks: Relief Coach' : ''));
+}
+function doAttendance(btn) {
+  if (!ATT) return;
+  if (!pinVal()) { showErr('Please enter your PIN.'); return; }
+  var bad = ATT.rows.find(function(r, i) { attPaint(i); return r.status !== 'Absent' && isNaN(hoursBetween(r.tin, r.tout)); });
+  if (bad) { showErr('Please check the times for ' + bad.c.name + '. Time out must be after time in.'); return; }
+  run(btn, 'saveCoachAttendance', { teacherId: ME, pin: pinVal(), itemType: ATT.kind, itemId: ATT.id, entries: ATT.rows.map(function(r, i) {
+    var n = document.getElementById('attNote' + i);
+    return { coachId: r.c.id, status: r.status, timeIn: r.tin, timeOut: r.tout, note: n ? n.value.trim() : '' };
+  }) });
+}
+
 function openDelete(kind, id) {
   var x = adFind(kind, id); if (!x) return;
   var ds = adBooked(x), word = kind === 'match' ? 'match' : 'event';
@@ -1358,6 +1498,10 @@ document.addEventListener('click', function(e) {
     case 'tab': closeSheet(); S.tab = g('tab'); render(); window.scrollTo(0, 0); if (S.tab === 'admin') loadAdmin(); break;
     case 'theme': setTheme(theme() === 'dark' ? 'light' : 'dark'); break;
     case 'aview': AD.view = g('view'); renderAdmin(); break;
+    case 'acmonth': AD.cmonth = shiftMonth(AD.cmonth || monthKey(today()), +g('step')); renderAdmin(); break;
+    case 'att': openAttendance(g('kind'), g('id')); break;
+    case 'attSet': ATT.rows[+g('i')].status = g('v'); attPaint(+g('i')); break;
+    case 'doAtt': doAttendance(b); break;
     case 'amonth': AD.month = shiftMonth(AD.month || monthKey(today()), +g('step')); AD.sel = ''; renderAdmin(); break;
     case 'aday': AD.sel = g('day') === AD.sel ? '' : g('day'); renderAdmin(); break;
     case 'adel': openDelete(g('kind'), g('id')); break;
