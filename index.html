@@ -81,10 +81,10 @@
   color-scheme:light;
   --accent:#0B5CFF;--on-accent:#fff;--accent-hover:#0049D6;
   --solid:#0E0F12;--on-solid:#fff;
-  --bg:#F4F5F7;--card:#fff;--cardline:#ECEDF0;--field:#F1F2F5;
+  --bg:#F4F5F7;--card:#fff;--cardline:#ECEDF0;--field:#E7E9ED;
   --ink:#0E0F12;--muted:#5C616C;--muted2:#686D78;--line:#E6E7EB;--line2:#D3D6DC;
-  --soft:#E9EFFF;--soft-line:#C3D3FB;--soft-ink:#0A45C2;--soft2:#F1F2F5;
-  --seg:#E9EAEE;--seg-on:#0E0F12;--seg-on-ink:#fff;
+  --soft:#E9EFFF;--soft-line:#C3D3FB;--soft-ink:#0A45C2;--soft2:#E7E9ED;
+  --seg:#DEE1E6;--seg-on:#0E0F12;--seg-on-ink:#fff;
   --need-bg:#FDEBD3;--need-ink:#7A4100;--need-line:#F2C98F;--dot:#D9822B;
   --off-bg:#ECEDF0;--off-ink:#3F444D;--off-line:#D3D6DC;
   --danger:#C0261A;--ok-bg:#EEF1F6;--ok-ink:#2E3440;
@@ -184,7 +184,7 @@ main{max-width:760px;margin:0 auto;padding:12px 16px calc(110px + env(safe-area-
 .b-pri{background:var(--accent);color:var(--on-accent)}
 .b-pri:hover{background:var(--accent-hover)}
 .b-out{background:var(--field);color:var(--ink)}
-.b-out:hover{background:var(--line)}
+.b-out:hover{background:var(--line2)}
 .b-grey{background:transparent;color:var(--ink);border:1.5px solid var(--line2)}
 .b-red{background:transparent;color:var(--danger);border:1.5px solid var(--danger)}
 .b-redfill{background:#C0261A;color:#fff}
@@ -313,6 +313,18 @@ textarea.inp{height:auto;padding:10px 12px;line-height:1.5;resize:vertical}
 .by{flex:1 1 140px;font-size:12.5px;color:var(--muted);min-width:0}
 .acts{display:flex;gap:8px;margin-left:auto;flex-shrink:0}
 .dlist{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:18px;background:var(--need-bg);color:var(--need-ink);font-size:14px}
+.tlink{display:block;background:none;border:0;padding:0;margin:0;text-align:left;color:inherit;font-family:inherit;cursor:pointer;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px}
+.tlink:hover{color:var(--accent)}
+.cchips [data-act="detail"]{text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.p-sent{background:#E3F2E6;color:#1E5A30}
+:root[data-theme="dark"] .p-sent{background:#173A25;color:#BDEBCB}
+.pgrow{display:flex;gap:12px;align-items:center;width:100%;padding:12px 14px;border-radius:18px;border:0;background:var(--field);color:var(--ink);font-family:inherit;text-align:left;cursor:pointer}
+.pgrow .bx{width:26px;height:26px;border-radius:8px;border:2px solid var(--muted2);background:var(--card);display:flex;align-items:center;justify-content:center;font-weight:900;color:transparent;flex-shrink:0}
+.pgrow.on{background:#E3F2E6}.pgrow.on .bx{background:#1E7A3C;border-color:#1E7A3C;color:#fff}
+:root[data-theme="dark"] .pgrow.on{background:#173A25}
+.pgrow b{display:block;font-size:15px}.pgsub{font-size:12.5px;color:var(--muted)}
+.pgok{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:18px;background:#E3F2E6;color:#1E5A30;font-size:14px;font-weight:700}
+:root[data-theme="dark"] .pgok{background:#173A25;color:#BDEBCB}
 .okbox{padding:12px 14px;border-radius:18px;background:var(--field);font-size:14px;font-weight:700}
 /* Coach attendance */
 .attok{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:16px;background:var(--field);font-size:13.5px}
@@ -674,13 +686,15 @@ function itemCard(it, opt) {
   if (it.kind === 'MATCH' && it.m.pmNeeded && !isCancelledMatch(it)) pills += '<span class="pill p-ok">PM Duty</span>';
   if (it.kind === 'MATCH' && /postponed/i.test(it.m.status)) pills += '<span class="pill p-post">Postponed</span>';
   if (isCancelledMatch(it)) pills += '<span class="pill p-cxl">Cancelled</span>';
+  if (pgSentOf(it)) pills += '<span class="pill p-sent">PG sent</span>';
   pills += typePill(it);
   var sub = '';
   if (it.kind === 'MATCH') sub = [it.m.venue, it.m.round].filter(Boolean).join(' · ');
   else if (!isNoCca(it)) sub = [it.s.groups, it.s.venue].filter(Boolean).join(' · ');
   var h = '<article class="' + cls + '">' +
     '<div class="row"><span class="when">' + esc(whenOf(it)) + '</span><span class="pills">' + pills + '</span></div>' +
-    '<div class="ttl">' + esc(isNoCca(it) ? 'No training · ' + titleOf(it) : titleOf(it)) + '</div>' +
+    (isNoCca(it) || opt.noLink ? '<div class="ttl">' + esc(isNoCca(it) ? 'No training · ' + titleOf(it) : titleOf(it)) + '</div>'
+      : '<button type="button" class="ttl tlink" ' + attr({ act: 'detail', kind: it.kind, id: it.id }) + '>' + esc(titleOf(it)) + '</button>') +
     (sub ? '<div class="sub">' + esc(sub) + '</div>' : '');
   if (hz) h += '<div class="warn haze-' + hz + '">' + ICON.warn + '<span>' + (hz === 'high' ? 'Haze SOP: no training today.' : 'Haze SOP: no outdoor training. Train indoors or cancel.') + '</span></div>';
   if (opt.details && it.kind === 'MATCH' && !isCancelledMatch(it)) {
@@ -788,7 +802,8 @@ function calendarHtml() {
       its.slice(0, 3).forEach(function(x) {
         var c = x.kind === 'MATCH' ? 'cm' : (isNoCca(x) ? 'cx' : (isEvent(x) ? 'ce' : 'ct'));
         var label = x.kind === 'MATCH' ? 'Match · ' + shortDiv(x.m.division) + (isCancelledMatch(x) ? ' (cancelled)' : '') : (isNoCca(x) ? 'No CCA · ' + x.s.title : x.s.title || x.s.type);
-        chips += '<i class="' + c + '">' + esc(label) + '</i>';
+        chips += isNoCca(x) ? '<i class="' + c + '">' + esc(label) + '</i>'
+          : '<i class="' + c + '" ' + attr({ act: 'detail', kind: x.kind, id: x.id }) + ' title="Open details">' + esc(label) + '</i>';
       });
       if (its.length > 3) chips += '<i class="ct">+' + (its.length - 3) + ' more</i>';
       var aria = dShort(dk) + (its.length ? ': ' + its.map(titleOf).join(', ') + (openN ? ', duty open' : '') : ': no CCA items');
@@ -1390,7 +1405,67 @@ function doEvent(btn) {
   run(btn, 'saveEvent', { teacherId: ME, pin: pinVal(), event: { id: btn.getAttribute('data-id'), title: v('eTitle'), date: v('eDate'), start: v('eStart'), end: v('eEnd'), venue: v('eVenue'), groups: groups, needed: v('eNeed'), noTraining: v('eTrain') === 'off' } });
 }
 
+/* ---------- Details sheet (tap a name) ---------- */
+function pgSentOf(it) { return it.kind === 'MATCH' ? !!it.m.pgSent : (isEvent(it) && !!it.s.pgSent); }
+function pgAble(it) { return it.kind === 'MATCH' ? !isCancelledMatch(it) : isEvent(it); }
+function pgWho(o) { return (o.pgBy ? 'Sent by ' + o.pgBy : 'Sent') + (o.pgOn ? ' · ' + dShort(o.pgOn) : ''); }
+function pgRow(it) {
+  if (!pgAble(it)) return '';
+  var o = it.kind === 'MATCH' ? it.m : it.s, sent = !!o.pgSent;
+  if (!isAdmin()) return '<div class="pgsub" style="font-size:14px">' + (sent ? '✓ PG sent · ' + esc(pgWho(o)) : 'PG not sent yet.') + '</div>';
+  return '<button type="button" class="pgrow' + (sent ? ' on' : '') + '" role="checkbox" aria-checked="' + sent + '" ' + attr({ act: 'pgTick', kind: it.kind, id: it.id }) + '><span class="bx">✓</span><span><b>PG sent</b><span class="pgsub">' +
+    esc(sent ? pgWho(o) + '. Tap again to undo.' : 'Admins only. Tick once the PG notice is out.') + '</span></span></button>';
+}
+function openDetail(kind, id) {
+  var it = findItem(kind, id); if (!it) { toast('This item could not be found. Please refresh.', true); return; }
+  var h = sheetTop(it.kind === 'MATCH' ? 'Match' : (isEvent(it) ? 'Event' : (/school team/i.test(it.s.type) ? 'School team training' : 'Training'))) +
+    itemCard(it, { bare: true, details: true, noLink: true, result: true });
+  if (pgAble(it)) h += '<button type="button" class="btn b-out big full" ' + attr({ act: it.kind === 'MATCH' ? 'pgOne' : 'pgEv', id: it.id }) + '>PG text</button>' + pgRow(it);
+  openSheet({ kind: 'detail', item: kind + '|' + id }, h);
+}
+function pgTick(btn, kind, id) {
+  var it = findItem(kind, id); if (!it || S.busy) return;
+  var o = it.kind === 'MATCH' ? it.m : it.s;
+  S.busy = true; btn.disabled = true;
+  call('setPgSent', { teacherId: ME, items: [{ kind: kind, id: id }], sent: !o.pgSent }).then(function(r) {
+    S.busy = false; toast(r.message);
+    return load(true).then(function() { if (S.sheet && S.sheet.kind === 'detail') openDetail(kind, id); });
+  }).catch(function(e) { S.busy = false; btn.disabled = false; toast(e.message, true); });
+}
+
 /* ---------- PG text ---------- */
+function pgEvent(s) {
+  var lines = ['Venue: ' + (s.venue || 'to be confirmed'), 'Date: ' + dLong(s.date), 'Time: ' + (s.start ? tmRange(s.start, s.end) : 'to be confirmed')];
+  if (s.groups) lines.push('For: ' + s.groups);
+  return { title: 'Football CCA: ' + s.title, body: 'Dear parents/guardians,\n\nYour child/ward will be taking part in ' + s.title + '. Here are the details:\n\n' + lines.join('\n') + signOff() };
+}
+function openPgEvent(id) {
+  var s = D.sessions.find(function(x) { return x.id === id; }); if (!s) return;
+  S.pgItems = [{ kind: 'SESSION', id: id }];
+  openSheet({ kind: 'pg' }, pgSheet('PG text', s.title, pgEvent(s), ''));
+  paintPgMark();
+}
+/* "Mark as PG sent" under the PG text (admins). */
+function paintPgMark() {
+  var box = document.getElementById('pgMarkBox'); if (!box) return;
+  var list = (S.pgItems || []).map(function(x) { return findItem(x.kind, x.id); }).filter(Boolean);
+  if (!isAdmin() || !list.length) { box.innerHTML = ''; return; }
+  var n = list.length, word = list[0].kind === 'MATCH' ? (n === 1 ? 'match' : n + ' matches') : 'event';
+  if (list.every(pgSentOf)) {
+    var o = list[0].kind === 'MATCH' ? list[0].m : list[0].s;
+    box.innerHTML = '<div class="pgok"><span>✓ ' + (n === 1 ? 'Marked as PG sent' : 'All ' + n + ' marked as PG sent') + '</span><span style="font-weight:600;font-size:13px">' + esc(pgWho(o)) + '</span></div>' +
+      '<button type="button" class="btn b-grey full" data-act="pgMark" data-sent="0">Undo PG sent</button>';
+  } else {
+    box.innerHTML = '<button type="button" class="btn b-pri big full" data-act="pgMark" data-sent="1">Mark ' + (n === 1 ? 'this ' : 'these ') + word + ' as PG sent</button><p class="note">Admins only. Do this once the notice is out on Parents Gateway.</p>';
+  }
+}
+function pgMark(btn, sent) {
+  if (S.busy || !(S.pgItems || []).length) return;
+  S.busy = true; btn.disabled = true;
+  call('setPgSent', { teacherId: ME, items: S.pgItems, sent: sent }).then(function(r) {
+    S.busy = false; toast(r.message); return load(true).then(paintPgMark);
+  }).catch(function(e) { S.busy = false; btn.disabled = false; toast(e.message, true); });
+}
 function pgLines(m) {
   var out = ['Venue: ' + (m.venue || 'to be confirmed'), 'Date: ' + dLong(m.date)];
   out.push('Dismissal from class: ' + (m.dismissal ? tm(m.dismissal) : 'to be confirmed'));
@@ -1423,12 +1498,14 @@ function pgSheet(title, sub, pg, switchHtml) {
     '<div class="lbl">PG Title</div><input class="inp" id="pgTitle" readonly value="' + esc(pg.title) + '" aria-label="PG title">' +
     '<div class="lbl">Message</div><textarea class="inp" id="pgBody" readonly rows="16" aria-label="PG message">' + esc(pg.body) + '</textarea>' +
     '<div class="two"><button type="button" class="btn b-pri big" data-act="pgCopy">' + ICON.copy + 'Copy text</button><button type="button" class="btn b-out big" data-act="pgSave">' + ICON.down + 'Download .txt</button></div>' +
-    '<p class="note">Copy, then paste into PG. Or save as .txt.</p>';
+    '<p class="note">Copy, then paste into PG. Or save as .txt.</p><div id="pgMarkBox" class="stack"></div>';
 }
 function openPgOne(id) {
   var m = D.matches.find(function(x) { return x.id === id; }); if (!m) return;
   var sw = '<div class="seg"><button type="button" class="on">One match</button><button type="button" data-act="pgSelect">Group of matches</button></div>';
+  S.pgItems = [{ kind: 'MATCH', id: id }];
   openSheet({ kind: 'pg' }, pgSheet('PG text', m.division + ' vs ' + m.opponent, pgOne(m), sw));
+  paintPgMark();
 }
 function openPgSelect() {
   var t = today();
@@ -1439,7 +1516,8 @@ function openPgSelect() {
   Object.keys(groups).forEach(function(r, gi) {
     h += '<div class="row"><b style="color:var(--soft-ink)">' + esc(r) + '</b><button type="button" class="btn b-out" style="height:36px" data-act="pgAll" data-g="' + gi + '">Select all</button></div><div class="stack">' +
       groups[r].map(function(m) {
-        return '<label class="opt" data-pgl="' + esc(m.id) + '"><input type="checkbox" class="pgPick" data-g="' + gi + '" value="' + esc(m.id) + '"><span style="flex:1;min-width:0"><span class="row"><span class="when">' + esc(dShort(m.date)) + '</span>' + (/postponed/i.test(m.status) ? '<span class="pill p-post">Postponed</span>' : '') + '</span><span class="o1">' + esc(m.division + ' vs ' + m.opponent) + '</span><span class="o2">' + esc([m.venue, m.kickoff ? 'Kick-off ' + tm(m.kickoff) : ''].filter(Boolean).join(' · ')) + '</span></span></label>';
+        return '<label class="opt" data-pgl="' + esc(m.id) + '"><input type="checkbox" class="pgPick" data-g="' + gi + '" value="' + esc(m.id) + '"><span style="flex:1;min-width:0"><span class="row"><span class="when">' + esc(dShort(m.date)) + '</span>' + (/postponed/i.test(m.status) ? '<span class="pill p-post">Postponed</span>' : '') + '</span><span class="o1">' + esc(m.division + ' vs ' + m.opponent) + '</span><span class="o2">' + esc([m.venue, m.kickoff ? 'Kick-off ' + tm(m.kickoff) : ''].filter(Boolean).join(' · ')) + '</span>' +
+          (m.pgSent ? '<span class="pill p-sent" style="align-self:flex-start;margin-top:3px">✓ PG sent · ' + esc(pgWho(m).replace(/^Sent by /, '')) + '</span>' : '') + '</span></label>';
       }).join('') + '</div>';
   });
   h += '<button type="button" class="btn b-pri big full" id="pgGo" data-act="pgMake" disabled>Tick at least one match</button><p class="note">Shows confirmed and postponed matches.</p>';
@@ -1458,7 +1536,9 @@ function pgPickChanged() {
 function openPgGroup(ids) {
   var list = D.matches.filter(function(m) { return ids.indexOf(m.id) >= 0; }).sort(function(a, b) { return a.date.localeCompare(b.date) || a.kickoff.localeCompare(b.kickoff); });
   var change = '<button type="button" class="btn b-grey" data-act="pgSelect">Change matches</button>';
+  S.pgItems = list.map(function(m) { return { kind: 'MATCH', id: m.id }; });
   openSheet({ kind: 'pg' }, pgSheet('PG text · ' + list.length + (list.length === 1 ? ' match' : ' matches'), '', pgGroup(list), change));
+  paintPgMark();
 }
 function pgCopy() {
   var text = S.pg ? S.pg.title + '\n\n' + S.pg.body : '';
@@ -1531,6 +1611,10 @@ document.addEventListener('click', function(e) {
     case 'doEvent': if (!pinVal()) { showErr('Please enter your admin PIN.'); break; } doEvent(b); break;
     case 'doRemoveEvent': if (!pinVal()) { showErr('Please enter your admin PIN to remove the event.'); break; } run(b, 'removeEvent', { teacherId: ME, pin: pinVal(), id: g('id') }); break;
     case 'pgOne': openPgOne(g('id')); break;
+    case 'pgEv': openPgEvent(g('id')); break;
+    case 'detail': e.preventDefault(); e.stopPropagation(); clearTimeout(hoverTimer); openDetail(g('kind'), g('id')); break;
+    case 'pgTick': pgTick(b, g('kind'), g('id')); break;
+    case 'pgMark': pgMark(b, g('sent') === '1'); break;
     case 'pgSelect': openPgSelect(); break;
     case 'pgAll':
       var cs = document.querySelectorAll('.pgPick[data-g="' + g('g') + '"]'), all = Array.prototype.every.call(cs, function(c) { return c.checked; });

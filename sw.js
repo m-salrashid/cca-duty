@@ -1,8 +1,8 @@
-// CCA Duty service worker (version e21d0776).
+// CCA Duty service worker (version 65a2e291).
 // Same-site files load from the network first, so updates show at once;
 // the saved copy is used only when the phone is offline.
 // Duties and air quality go to Google and are never cached here.
-const CACHE = 'ccaduty-e21d0776';
+const CACHE = 'ccaduty-65a2e291';
 const SHELL = ['./', 'index.html', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png'];
 self.addEventListener('install', e => {
